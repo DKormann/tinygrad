@@ -1,22 +1,16 @@
 # %%
 from tinygrad.tensor import Tensor
-from temp.print_tree import print_tree
 from tinygrad.nn.optim import Adam, LAMB
+from tinygrad.helpers import dtypes
+from tinygrad.ops import Device
+from extra.utils import print_tree
+# from temp.print_tree import print_tree
 
-# %%
 import functools
 import itertools
 
-# %%
-from tinygrad.helpers import dtypes
-from tinygrad.ops import Device
 
-# Device.DEFAULT = 'METAL'
-
-# %% [markdown]
-# # data
-
-# %%
+# %% data loading
 import pathlib
 import json
 import  numpy as np
@@ -88,16 +82,10 @@ print(X[0].shape, len(Y[0]))
 
 
 # %%
-_=plt.plot(X[0][:,0,2:6])
-
-# %% [markdown]
-# ## tokenize
-
-# %%
 import numpy as np
 from tinygrad.tensor import Tensor
 
-# %%
+# %% text parsing
 characters = [*" 'abcdefghijklmnopqrstuvwxyz","<skip>"]
 c2i= dict([(c,i) for i,c in enumerate(characters)])
 charn = len(characters)
@@ -115,14 +103,10 @@ def text_decode(toks:Tensor):
 
 assert text_decode(text_encode(Y)) == Y
 
-# %%
+
 labels = text_encode(Y[0])[0]
 
-# %% [markdown]
-# # model
-
-# %%
-# from models.rnnt import RNNT, LSTM, LSTMCell, StackTime,Encoder, Prediction, Joint
+# %% imports
 from tinygrad.jit import TinyJit
 from tinygrad.nn import Embedding, Linear
 
@@ -281,8 +265,7 @@ class Prediction:
     x_, hc = self.rnn(emb.transpose(0, 1), hc)
     return x_.transpose(0, 1), hc
 
-# %% [markdown]
-# # training
+
 
 # %% calc_loss
 def calc_loss(enc,distribution,labels):
@@ -354,11 +337,7 @@ def train_step(X,Y):
   print(f"Loss: {Loss}")
   return Loss,distribution_grad
 
-# %%
-train_step()
 
-# %%
-train_step()
 
 # %%
 loss, distribution_grad =  train_step()
