@@ -278,16 +278,15 @@ def calc_loss(enc,distribution,labels):
   alpha[0,0] = 1.
 
   for t in range(T):
-      for u in range(U):
-          if t < T-1: 
-              alpha[t+1,u] = alpha[t,u] * distribution[0,u,t,-1]
-          if u < U-1: 
-              label = int((labels)[u])
-              alpha[t,u+1] += alpha[t,u] * distribution[0,u,t,label]
+    for u in range(U):
+      if t < T-1: 
+        alpha[t+1,u] = alpha[t,u] * distribution[0,u,t,-1]
+      if u < U-1: 
+        label = int((labels)[u])
+        alpha[t,u+1] += alpha[t,u] * distribution[0,u,t,label]
 
   P = alpha[-1,-1] * distribution[0,-1,-1,-1]
   Loss = -np.log(P)
-  Loss_grad = 1
 
   alpha_grad = np.zeros((T,U))
   alpha_grad[-1,-1] = -1/alpha[-1,-1]
@@ -306,7 +305,62 @@ def calc_loss(enc,distribution,labels):
               distribution_grad[0,u,t,label] += alpha_grad[t,u+1] * alpha[t,u]
 
   return Loss,distribution_grad
-  
+
+#%% calc_loss_logarithmic
+def calc_loss_logarithmic(enc,distribution, labels):
+
+  T,U = distribution.shape[2],distribution.shape[1]
+  assert len(labels) == U-1, f"len labels {len(labels)} doesnt match U-1 {U-1}"
+  assert enc.shape[1] == T, f"{enc.shape}[1] != {T}"
+
+  alpha = np.zeros((T,U))
+  alpha[0,0] = 1.
+
+  distribution_log = np.log(distribution)
+
+  alpha_log = np.ones((T,U)) * (-np.Infinity)
+  alpha_log[0,0] = 0.
+
+  for t in range(T):
+    for u in range(U):
+
+      a=b=0
+
+      if t > 0 : 
+        alpha[t,u] = alpha[t-1,u] * distribution[0,u,t-1,-1]
+        a = alpha_grad[t-1,u] + distribution_grad[0,u,t-1,-1]
+      if u > 0 : 
+        label = int((labels)[u-1])
+        alpha[t,u] += alpha[t,u-1] * distribution[0,u-1,t,label]
+        b = alpha_grad[t,u-1] + distribution_grad[0,u-1,t,label]
+      
+      np.
+
+
+
+
+  P = alpha[-1,-1] * distribution[0,-1,-1,-1]
+  Loss = -np.log(P)
+
+  alpha_grad = np.zeros((T,U))
+  alpha_grad[-1,-1] = -1/alpha[-1,-1]
+  distribution_grad = np.zeros_like(distribution,dtype=np.float64)
+  distribution_grad[0,-1,-1,-1] = -1/distribution[0,-1,-1,-1]
+
+  for t in reversed(range(T)):
+    for u in reversed(range(U)):
+      if t < T-1:
+        alpha_grad[t,u] += alpha_grad[t+1,u] * distribution[0,u,t,-1]
+        distribution_grad[0,u,t,-1] += alpha_grad[t+1,u] * alpha[t,u]
+      if u < U-1:
+        label = int((labels)[u])
+
+        alpha_grad[t,u] += alpha_grad[t,u+1] * distribution[0,u,t,label]
+        distribution_grad[0,u,t,label] += alpha_grad[t,u+1] * alpha[t,u]
+
+  return Loss,distribution_grad
+
+# %%
 
 # %% rnnt
 rnnt= RNNT()
@@ -336,8 +390,6 @@ def train_step(X,Y):
   opt.step()
   print(f"Loss: {Loss}")
   return Loss,distribution_grad
-
-
 
 # %%
 loss, distribution_grad =  train_step()
