@@ -15,6 +15,8 @@ from tinygrad.codegen.kernel import LocalBuffer, Kernel
 from tinygrad.lazy import vars_from_ast
 from tinygrad.features.image import to_image_idx
 
+from temp.utils import Timing
+
 # bottom ones are asm only
 class UOps(Enum):
   LOOP = auto(); IF = auto(); END = auto(); SPECIAL = auto() # loops can be global, local, or other # noqa: E702
@@ -149,6 +151,7 @@ class Linearizer(Kernel):
 
   kernel_cnt: Final[DefaultDict[str, int]] = defaultdict(int)
   def linearize(self):
+    Timing("line")
     # no new opts and we already ran? skip relinearizing
     if self.applied_opts == self.applied_opts_cache: return self
 
@@ -474,6 +477,7 @@ class Linearizer(Kernel):
 
   @functools.lru_cache
   def ast_parse(self, x:LazyOp, offs:Optional[int], do_reduce=False, loop_ctx=tuple()) -> List[UOp]:
+    Timing("astparse")
     if x.op in BufferOps: return self.loaded_buffers[x.arg]
     if x.op == UnaryOps.NOOP: return self.ast_parse(cast(LazyOp, x.src[0]), offs)
     if x.op == UnaryOps.CAST: return [self.uop(UOps.CAST, x.arg[0], (u,), x.arg) if not isinstance(x.arg[0], ImageDType) else u for u in self.ast_parse(cast(LazyOp, x.src[0]), offs)]

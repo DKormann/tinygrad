@@ -6,6 +6,7 @@ from tinygrad.helpers import ansilen, prod, DEBUG, getenv, GlobalCounters, DType
 from tinygrad.runtime.lib import RawBuffer
 from tinygrad.shape.symbolic import Variable, sym_infer, NumNode
 from dataclasses import dataclass
+from temp.utils import Timing
 
 # these are the llops your accelerator must implement, along with toCpu
 # the Enum class doesn't work with mypy, this is static. sorry it's ugly
@@ -57,10 +58,12 @@ class LazyOp:
   @functools.cached_property
   def buffers(self) -> Tuple[LazyBuffer, ...]: return tuple(dedup(sum([x.buffers for x in self.src], ())))
   @functools.cached_property
-  def hash(self): return hash((self.op,self.src, self.arg))
+  def hash(self): return hash((self.key, id(self.src), self.arg))
   def __hash__(self): return self.hash
 
-  @property
+  # def __eq__(self,other:LazyOp): return self.hash == other.hash and self.key == other.key
+
+  @functools.cached_property
   def key(self): return (self.op, tuple(map(lambda x: getattr(x, "key", x), self.src)), getattr(self.arg, "key", self.arg))
 
   def map_buffers(self, real_srcs: MutableMapping[Any, Any]) -> LazyOp: return real_srcs.get(self) or real_srcs.update ({self:LazyOp(self.op, tuple([y.map_buffers(real_srcs) if y not in real_srcs else real_srcs[y] for y in self.src]), self.arg)}) or real_srcs[self]
@@ -191,6 +194,7 @@ class ASTRunner:
       assert all(v._val is None for v in self.vars), f"ASTRunner contains bound Variable {self.vars}"
 
   def exec(self, rawbufs:List[Optional[RawBuffer]], var_vals:Optional[Dict[Variable, int]]=None, force_wait=False) -> Optional[float]:
+    Timing("op. exec")
     from tinygrad.jit import CacheCollector
     et = self(rawbufs, var_vals, force_wait=force_wait)
     CacheCollector.add(self, rawbufs, var_vals if var_vals is not None else {})
@@ -313,12 +317,14 @@ class Compiled:
     self.method_cache: Dict[LazyOp, CompiledASTRunner] = {}
 
   def to_program(self, k:Linearizer) -> CompiledASTRunner:
+    Timing("to prog")
     k.linearize()
     src, runtime_args = self.renderer(k.function_name, k.uops)
     return CompiledASTRunner(k.ast, k.function_name, src, k.global_size, k.local_size,
                              display_name=k.display_name, runtime_args=runtime_args).build(self.compiler, self.runtime)
 
   def exec_ast(self, ast:LazyOp, output:LazyBuffer, inputs:Tuple[LazyBuffer, ...], var_vals:Dict[Variable, int], **kwargs):
+    Timing("exec ast")
     # check if we can reuse the output buffer
     # if it's aliased, don't use it
     # TODO: this is pretty wrong actually, who knows where else this buffer is used?
@@ -331,19 +337,31 @@ class Compiled:
           if any(not x.arg.st.contiguous for x in ast.get_lazyops() if x.op == BufferOps.MEM and x.arg.idx == i+1):
             output.realized = None
             break
+    Timing("exec ast0")
+    
 
     # we don't have an output buffer, we have to create it, and create to max size if it has symbolic shape
     if output.realized is None:
       output.realized = self.buffer(prod((s if isinstance(s, int) else s.max for s in output.shape)), output.dtype, **kwargs)
       if output.realized.size == 0: return output.realized
+    Timing("exec ast1")
+
 
     # all the rawbuffers
     rawbuffers = [output.realized] + [x.realized for x in inputs]
+    Timing("exec ast2")
+
 
     if ast not in self.method_cache: self.method_cache[ast] = get_optimized_program(self.linearizer_opts, self.to_program, ast, rawbuffers)
-    self.method_cache[ast].exec(rawbuffers, var_vals)
+    Timing("exec ast3")
+
+    runner = self.method_cache.get(ast)
+    Timing("exec runner")
+    runner.exec(rawbuffers, var_vals)
+    Timing("end exec")
 
 def get_optimized_program(linearizer_opts:LinearizerOptions, to_program, ast:LazyOp, rawbuffers:List[RawBuffer]) -> CompiledASTRunner:
+  Timing("get opt")
   if DEBUG >= 3:
     from tinygrad.graph import print_tree
     print_tree(ast)

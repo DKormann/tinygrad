@@ -35,6 +35,7 @@ import tinygrad.mlops as mlops
 
 # **** start with two base classes, Tensor and Function ****
 
+from temp.utils import Timing
 class Tensor:
   __slots__ = "lazydata", "requires_grad", "grad", "_ctx"
   __deletable__ = ('_ctx',)
@@ -102,7 +103,10 @@ class Tensor:
     run_schedule(sched)
 
   def realize(self) -> Tensor:
-    run_schedule(self.lazydata.schedule())
+    sched = self.lazydata.schedule()
+    Timing("run sched")
+    run_schedule(sched)
+    Timing("end sched")
     return self
 
   def assign(self, x) -> Tensor:
