@@ -155,9 +155,14 @@ class LazyBuffer:
   def buffers(self) -> Tuple[LazyBuffer, ...]: return (self,)
   def map_buffers(self, real_srcs: Mapping[Any, Union[LazyBuffer, LazyOp]]): return real_srcs.get(self, self)
   def get_lazyops(self) -> List[LazyOp]: return []
-  def __hash__(self):
-    Timing("hash buf")
-    return hash(id(self))
+
+  # @functools.cached_property
+  # def hash(self): 
+
+  #   return hash((self.op, self.shape, self.))
+  # def __hash__(self):
+  #   Timing("hash buf")
+  #   return self.hash
 
   # *** scheduling ***
 

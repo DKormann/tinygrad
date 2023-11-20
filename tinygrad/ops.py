@@ -58,13 +58,23 @@ class LazyOp:
   @functools.cached_property
   def buffers(self) -> Tuple[LazyBuffer, ...]: return tuple(dedup(sum([x.buffers for x in self.src], ())))
   @functools.cached_property
-  def hash(self): return hash((self.key, id(self.src), self.arg))
+  def hash(self): 
+    Timing("hash op")
+    res = hash((self.op, hash(self.src), self.arg))
+    Timing("else")
+    return res
   def __hash__(self): return self.hash
 
-  # def __eq__(self,other:LazyOp): return self.hash == other.hash and self.key == other.key
+  # def __eq__(self,other:LazyOp): 
+  #   Timing("eq")
+  #   return self.hash == other.hash
 
   @functools.cached_property
-  def key(self): return (self.op, tuple(map(lambda x: getattr(x, "key", x), self.src)), getattr(self.arg, "key", self.arg))
+  def key(self): 
+    Timing("op key")
+    return (self.op, 
+            tuple(map(lambda x: getattr(x, "key", x), self.src)), 
+            getattr(self.arg, "key", self.arg))
 
   def map_buffers(self, real_srcs: MutableMapping[Any, Any]) -> LazyOp: return real_srcs.get(self) or real_srcs.update ({self:LazyOp(self.op, tuple([y.map_buffers(real_srcs) if y not in real_srcs else real_srcs[y] for y in self.src]), self.arg)}) or real_srcs[self]
 
@@ -338,21 +348,21 @@ class Compiled:
             output.realized = None
             break
     Timing("exec ast0")
-    
 
     # we don't have an output buffer, we have to create it, and create to max size if it has symbolic shape
     if output.realized is None:
       output.realized = self.buffer(prod((s if isinstance(s, int) else s.max for s in output.shape)), output.dtype, **kwargs)
       if output.realized.size == 0: return output.realized
     Timing("exec ast1")
-
-
     # all the rawbuffers
     rawbuffers = [output.realized] + [x.realized for x in inputs]
     Timing("exec ast2")
 
-
-    if ast not in self.method_cache: self.method_cache[ast] = get_optimized_program(self.linearizer_opts, self.to_program, ast, rawbuffers)
+    check = ast in self.method_cache
+    Timing("exec ast2.1")
+    if not check: method = get_optimized_program(self.linearizer_opts, self.to_program, ast, rawbuffers)
+    Timing("exec ast2.2")
+    if not check: self.method_cache[ast] =method
     Timing("exec ast3")
 
     runner = self.method_cache.get(ast)
