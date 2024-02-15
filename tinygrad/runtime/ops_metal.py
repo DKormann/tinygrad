@@ -7,6 +7,8 @@ from tinygrad.helpers import prod, getenv, DEBUG, unwrap2
 from tinygrad.device import Compiled, LRUAllocator, Compiler
 from tinygrad.renderer.cstyle import MetalRenderer
 
+metal_hack = True
+
 class MetalCompiler(Compiler):
   linearizer_opts = LinearizerOptions("METAL", has_tensor_cores=os.uname().machine == "arm64")
   def __init__(self, device:Optional[MetalDevice]):
@@ -18,6 +20,9 @@ class MetalCompiler(Compiler):
       # NOTE: if you run llvm-dis on "air" you can see the llvm bytecode
       air = subprocess.check_output(['xcrun', '-sdk', 'macosx', 'metal', '-x', 'metal', '-c', '-', '-o', '-'], input=src.encode('utf-8'))
       return subprocess.check_output(['xcrun', '-sdk', 'macosx', 'metallib', '-', '-o', '-'], input=air)
+    print("mtl compile")
+    if metal_hack:
+      return src.encode('utf-8')
     else:
       options = Metal.MTLCompileOptions.new()
       options.setFastMathEnabled_(getenv("METAL_FAST_MATH"))
@@ -32,8 +37,13 @@ class MetalProgram:
         shader.write(lib)
         shader.flush()
         os.system(f"cd {pathlib.Path(__file__).parents[2]}/disassemblers/applegpu && python3 compiler_explorer.py {shader.name}")
-    data = libdispatch.dispatch_data_create(lib, len(lib), None, None)
-    self.library = unwrap2(self.device.device.newLibraryWithData_error_(data, None))
+    if metal_hack:
+      options = Metal.MTLCompileOptions.alloc().init()
+      src = lib.decode('utf-8')
+      self.library = unwrap2(self.device.device.newLibraryWithSource_options_error_(src, options, None))
+    else:
+      data = libdispatch.dispatch_data_create(lib, len(lib), None, None)
+      self.library = unwrap2(self.device.device.newLibraryWithData_error_(data, None))
     self.fxn = self.library.newFunctionWithName_(name)
     self.pipeline_state = unwrap2(self.device.device.newComputePipelineStateWithFunction_error_(self.fxn, None))
 
