@@ -3,9 +3,9 @@ from typing import Any, Tuple
 from onnx.backend.base import Backend, BackendRep
 import onnx.backend.test
 import numpy as np
-from tinygrad.tensor import Tensor
-from tinygrad.helpers import getenv, CI, OSX
-from tinygrad.device import Device
+from tinygrad import Tensor, Device, dtypes
+from tinygrad.helpers import getenv, OSX
+from test.helpers import is_dtype_supported
 
 # pip3 install tabulate
 pytest_plugins = 'onnx.backend.test.report',
@@ -35,6 +35,7 @@ class TinygradBackend(Backend):
 
   @classmethod
   def supports_device(cls, device: str) -> bool:
+    # NOTE: this is onnx CPU
     return device == "CPU"
 
 backend_test = onnx.backend.test.BackendTest(TinygradBackend, __name__)
@@ -48,12 +49,7 @@ backend_test.exclude('test_adam_multiple_cpu')
 backend_test.exclude('test_nesterov_momentum_cpu')
 
 # about different dtypes
-if Device.DEFAULT in ["TORCH"]:
-  backend_test.exclude('uint16')
-  backend_test.exclude('uint32')
-  backend_test.exclude('uint64')
-
-if Device.DEFAULT in ["METAL"] or (OSX and Device.DEFAULT == "GPU"):
+if not is_dtype_supported(dtypes.float64):
   backend_test.exclude('float64')
   backend_test.exclude('DOUBLE')
   # these have float64 inputs
@@ -63,8 +59,7 @@ if Device.DEFAULT in ["METAL"] or (OSX and Device.DEFAULT == "GPU"):
   backend_test.exclude('test_einsum_*')
   backend_test.exclude('test_cumsum_*')
 
-# no float16 in CI, LLVM segfaults, GPU requires cl_khr_fp16
-if Device.DEFAULT in ['LLVM', 'CUDA', 'GPU'] and CI:
+if not is_dtype_supported(dtypes.float16):
   backend_test.exclude('float16')
   backend_test.exclude('FLOAT16')
 
@@ -172,10 +167,6 @@ if Device.DEFAULT == "METAL" or (OSX and Device.DEFAULT == "GPU"):
   backend_test.exclude('test_mish_cpu')
   backend_test.exclude('test_mish_expanded_cpu')
 
-if Device.DEFAULT == 'METAL':
-  # with default fast math enabled, padding -inf does not work
-  backend_test.exclude('test_MaxPool3d_stride_padding_cpu')
-
 # TODO: llvm has problems with inf
 if Device.DEFAULT in ['LLVM']:
   backend_test.exclude('test_isinf_cpu')
@@ -183,7 +174,7 @@ if Device.DEFAULT in ['LLVM']:
   backend_test.exclude('test_isinf_positive_cpu')
 
 # # TODO: problems with nan
-if Device.DEFAULT in ['LLVM', 'METAL']:
+if Device.DEFAULT in ['LLVM']:
   backend_test.exclude('test_isnan_float16_cpu')
   backend_test.exclude('test_isnan_cpu')
 

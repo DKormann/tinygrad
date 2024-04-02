@@ -76,14 +76,12 @@ See [examples/beautiful_mnist.py](examples/beautiful_mnist.py) for the full vers
 
 tinygrad already supports numerous accelerators, including:
 
-- [x] [CPU](tinygrad/runtime/ops_cpu.py)
 - [x] [GPU (OpenCL)](tinygrad/runtime/ops_gpu.py)
 - [x] [C Code (Clang)](tinygrad/runtime/ops_clang.py)
 - [x] [LLVM](tinygrad/runtime/ops_llvm.py)
 - [x] [METAL](tinygrad/runtime/ops_metal.py)
 - [x] [CUDA](tinygrad/runtime/ops_cuda.py)
-- [x] [PyTorch](tinygrad/runtime/ops_torch.py)
-- [x] [HIP](tinygrad/runtime/ops_hip.py)
+- [x] [HSA](tinygrad/runtime/ops_hsa.py)
 
 And it is easy to add more! Your accelerator of choice only needs to support a total of ~25 low level ops.
 More information can be found in the [documentation for adding new accelerators](/docs/adding_new_accelerators.md).
