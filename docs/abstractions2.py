@@ -91,7 +91,7 @@ out = a.e(BinaryOps.ADD, b)
 
 # schedule the computation as a list of kernels
 sched = create_schedule([out])
-for si in sched: print(si.ast[0].op)
+for si in sched: print(si.ast[0].op)  # NOTE: the first two convert it to CLANG
 
 # DEBUGGING: print the compute ast as a tree
 from tinygrad.engine.graph import print_tree

@@ -55,6 +55,7 @@ class Runner:
 
 class CompiledRunner(Runner):
   def __init__(self, p:Program, precompiled:Optional[bytes]=None):
+    print(f'init {self=} on {p=}')
     if DEBUG >= 4: print(p.src)
     self.p:Program = p
     self.lib:bytes = precompiled if precompiled is not None else Device[p.dname].compiler.compile_cached(p.src)
@@ -64,6 +65,7 @@ class CompiledRunner(Runner):
   def __reduce__(self): return self.__class__, (self.p, self.lib)
 
   def __call__(self, rawbufs:List[Buffer], var_vals:Dict[Variable, int], wait=False) -> Optional[float]:
+    print(f"call {self=}, {rawbufs=}, {var_vals=}")
     global_size, local_size = self.p.launch_dims(var_vals)
     if global_size is not None and local_size is None and all_int(self.p.global_size): # type: ignore[arg-type]
       # TODO: this is copied from get_program
