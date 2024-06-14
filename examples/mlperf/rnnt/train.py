@@ -78,7 +78,6 @@ class Loss:
         ).realize()
       ))
     self.value = -self.a[-1].max(1).sum()
-    # print(f"{self.value=}")
 
   def backward(self):
     Tensor.no_grad = True
@@ -195,6 +194,7 @@ maxsecs = 5
 if __name__ == "__main__":
 
   ci, maxx, maxy = load_data(maxsecs)
+  print(maxx,maxy)
   train_set, test_set = ci[:-(2*BS)], ci[-(2*BS):]
   print(f"eval: {test()}")
   step = TinyJit(fb_pass)
