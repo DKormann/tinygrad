@@ -21,7 +21,7 @@ repos:
         pass_filenames: false
       - id: docs2
         name: docs2
-        entry: python3 docs/abstractions2.py
+        entry: python docs/abstractions2.py
         language: system
         always_run: true
         pass_filenames: false
@@ -33,19 +33,19 @@ repos:
         pass_filenames: false
       - id: tests
         name: subset of tests
-        entry: env PYTHONPATH="." python3 -m pytest -n=4 test/unit/ test/test_ops.py test/test_dtype.py test/test_schedule.py test/test_custom_function.py test/test_assign.py test/test_symbolic_shapetracker.py
+        entry: env PYTHONPATH="." python -m pytest -n=4 test/unit/ test/test_ops.py test/test_dtype.py test/test_schedule.py test/test_custom_function.py test/test_assign.py test/test_symbolic_shapetracker.py
         language: system
         always_run: true
         pass_filenames: false
       - id: example
         name: multi device tests
-        entry: python3 test/external/external_test_example.py
+        entry: python test/external/external_test_example.py
         language: system
         always_run: true
         pass_filenames: false
       - id: pylint
         name: pylint
-        entry: env PYTHONPATH="." python3 -m pylint tinygrad/
+        entry: env PYTHONPATH="." python -m pylint tinygrad/
         language: system
         always_run: true
         pass_filenames: false
