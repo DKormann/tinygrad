@@ -8,8 +8,9 @@ import unittest, pickle
 
 from tinygrad.helpers import DEBUG
 from tinygrad.dtype import dtypes, PtrDType
-from tinygrad.codegen.uops import UOp, UOps, UOpGraph
+from tinygrad.codegen.uops import UOp, UOps, UOpGraph, graph_rewrite
 from tinygrad.ops import BinaryOps
+from tinygrad.engine.graph import _tree, print_tree
 import functools
 
 def render(self) -> str:
@@ -103,20 +104,26 @@ class TestSymbolic(unittest.TestCase):
   #def test_var_becomes_num(self):
   #  assert isinstance(Variable("a", 2, 2), NumNode)
 
-  @unittest.expectedFailure
   def test_equality(self):
     idx1 = Variable("idx1", 0, 3)
     idx2 = Variable("idx2", 0, 3)
-    assert idx1 == idx1
-    assert idx1 != idx2
-    assert idx1*4 == idx1*4
-    assert idx1*4 != idx1*3
-    assert idx1*4 != idx1+4
-    assert idx1*4 != idx2*4
-    assert idx1+idx2 == idx1+idx2
-    assert idx1+idx2 == idx2+idx1
-    assert idx1+idx2 != idx2
-    assert idx1*idx2 == idx2*idx1
+
+    def is_eq(a,b):
+      uop = graph_rewrite(a.eq(b))
+      print_tree(uop)
+      return uop.minval == 1
+      return graph_rewrite(a.eq(b)).minval == 1
+
+    assert is_eq(idx1, idx1)
+    assert not is_eq(idx1, idx2)
+    assert is_eq(idx1*4, idx1*4)
+    assert not is_eq(idx1*4, idx1*3)
+    assert not is_eq(idx1*4, idx1+4)
+    assert not is_eq(idx1*4, idx2*4)
+    assert is_eq(idx1+idx2, idx1+idx2)
+    assert is_eq(idx1+idx2, idx2+idx1)
+    assert not is_eq(idx1+idx2, idx2)
+    assert is_eq(idx1*idx2, idx2*idx1)
 
   #def test_numnode_eq_int(self):
   #  n1 = NumNode(1)
@@ -313,7 +320,6 @@ class TestSymbolic(unittest.TestCase):
   def test_mul_div_factor_div(self):
     self.helper_test_variable((Variable("a", 0, 10)*4)//8, 0, 5, "(a//2)")
 
-  @unittest.expectedFailure
   def test_div_remove(self):
     self.helper_test_variable(Node.sum([Variable("idx0", 0, 127)*4, Variable("idx2", 0, 3)])//4, 0, 127, "idx0")
 

@@ -67,16 +67,15 @@ class UOp:
   @property
   def maxval(self)->int: return cast(int, self.bounds[1])
   @functools.cached_property
-  def bounds(self)-> Union[Tuple[int, int], Tuple[float, float]]:
+  def bounds(self)-> Tuple[Union[int, float], Union[int, float]]:
     # assert self.dtype in {dtypes.int, dtypes.bool}, f"bounds {self}"
     if self.op is UOps.DEFINE_VAR: return (self.src[0].minval, self.src[1].maxval)
     if self.op is UOps.CONST: return (self.arg, self.arg)
-
     if self.arg is BinaryOps.ADD: return (self.src[0].minval+self.src[1].minval, self.src[0].maxval+self.src[1].maxval)
     if self.arg is BinaryOps.MUL: return (self.src[0].minval*self.src[1].minval, self.src[0].maxval*self.src[1].maxval)
     if self.arg in {BinaryOps.CMPLT, BinaryOps.CMPNE}: return (0, 1)
     if self.arg is BinaryOps.IDIV: return (self.src[0].minval//self.src[1].maxval, self.src[0].maxval//self.src[1].minval)
-    if self.arg is UnaryOps.NEG: return (0, 1)
+    if self.arg is UnaryOps.NEG: return (-self.src[0].bounds[1], -self.src[0].bounds[0])
     if self.arg is BinaryOps.MOD: return (0, self.src[1].maxval-1)
     # raise NotImplementedError(f"bounds {self}")
     return float('-inf'), float('inf')
@@ -166,6 +165,8 @@ class UPat:
     if u.op is UOps.VAR: return UPat(name=name or u.arg, dtype=u.dtype) if len(u.src) == 0 else UPat.compile(u.src[0], name or u.arg)
     return UPat(u.op, u.arg, (list if u.commutative() else tuple)([UPat.compile(src) for src in u.src]) if u.src != () else None,
                 name, u.dtype, allow_any_len=(isinstance(name, str) and 'allow_any_len' in name))
+  
+  def sint(name:str): return UPat({UOps.CONST, UOps.DEFINE_VAR}, dtype=dtypes.int, name=name)
 
 T = TypeVar("T")
 def __unmatch(m1:Union[T, Set[T]], m2:T) -> bool: return m2 not in m1 if isinstance(m1, set) else m2 != m1
@@ -317,6 +318,13 @@ constant_folder = PatternMatcher([
   # ge_divides
   (UPat(UOps.ALU, BinaryOps.CMPLT, (UPat(UOps.ALU, BinaryOps.ADD, name='lhs', dtype=dtypes.int), UPat(UOps.CONST, name='b', dtype=dtypes.int))),
     simplify_sum_lt_const),
+  # a // b -> 0 if a.max < b.min
+  (UPat(UOps.ALU, arg=BinaryOps.IDIV, src=(UPat.sint('a'), UPat.sint('b'))), lambda a,b: UOp.const(dtypes.int, 0) if a.maxval < b.minval else None),
+  # (a * n + b) // n -> a + b // n
+  (UPat(UOps.ALU, arg=BinaryOps.IDIV, src=(UPat(UOps.ALU, arg=BinaryOps.ADD,
+    src=(UPat(UOps.ALU, arg=BinaryOps.MUL, src=(UPat.sint('a'), UPat.sint('n'))), UPat.sint('b'))), UPat.sint('n'))), lambda a,n,b: a + b // n),
+  # a == a -> 1
+  (UPat(UOps.ALU, arg=BinaryOps.CMPNE, src=(UPat(name='a'), UPat(name='a'))), lambda a: print(f"called rule on {a}") or UOp.const(dtypes.bool, 0)),
 
   # two stage mul, (x*c1)*c2 = x*(c1*c2)
   ((UOp.var("x") * UOp.cvar("c1")) * UOp.cvar("c2"), lambda x,c1,c2: x*UOp.const(x.dtype, exec_alu(BinaryOps.MUL, x.dtype, [c1.arg, c2.arg]))),
@@ -381,7 +389,7 @@ def get_children_dfs(u:UOp, children:Dict[UOp, List[UOp]], in_degree:Dict[UOp, i
     children[x].append(u)
   in_degree[u] = len(u.src)
 
-def graph_rewrite(sink:UOp, pm:PatternMatcher) -> UOp:
+def graph_rewrite(sink:UOp, pm:PatternMatcher=constant_folder) -> UOp:
   nodes: Dict[Tuple, UOp] = {}
   replace: Dict[UOp, UOp] = {}
   def __inner_rewrite(n:UOp) -> UOp:

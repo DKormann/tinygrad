@@ -81,7 +81,7 @@ def _tree(dag:Union[LazyOp, UOp, UPat], cycles, cnt):
   if (lid := id(dag)) in cycles and cycles[lid][1] > (tcnt := getenv("TREE_CYCLE_CNT", 5)) and tcnt >= 0:
     return [f"━⬆︎ goto {cycles[id(dag)][0]}: {dag.op}"]
   cycles[lid] = (cnt[0], 1 if lid not in cycles else cycles[lid][1]+1)
-  lines = [f"━┳ {dag.op} {dag.arg}"]
+  lines = [f"━┳ {dag.op} {dag.arg} {id(dag)}"]
   childs = [_tree(c, cycles, cnt) for c in src]
   for c in childs[:-1]: lines += [f" ┣{c[0]}"] + [f" ┃{l}" for l in c[1:]]
   return lines + [" ┗"+childs[-1][0]] + ["  "+l for l in childs[-1][1:]]
