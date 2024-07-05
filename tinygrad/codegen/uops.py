@@ -165,7 +165,7 @@ class UPat:
     if u.op is UOps.VAR: return UPat(name=name or u.arg, dtype=u.dtype) if len(u.src) == 0 else UPat.compile(u.src[0], name or u.arg)
     return UPat(u.op, u.arg, (list if u.commutative() else tuple)([UPat.compile(src) for src in u.src]) if u.src != () else None,
                 name, u.dtype, allow_any_len=(isinstance(name, str) and 'allow_any_len' in name))
-  
+
   def sint(name:str): return UPat({UOps.CONST, UOps.DEFINE_VAR}, dtype=dtypes.int, name=name)
 
 T = TypeVar("T")
