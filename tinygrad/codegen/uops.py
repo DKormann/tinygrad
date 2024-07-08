@@ -166,6 +166,7 @@ class UPat:
     return UPat(u.op, u.arg, (list if u.commutative() else tuple)([UPat.compile(src) for src in u.src]) if u.src != () else None,
                 name, u.dtype, allow_any_len=(isinstance(name, str) and 'allow_any_len' in name))
 
+  @staticmethod
   def sint(name:str): return UPat({UOps.CONST, UOps.DEFINE_VAR}, dtype=dtypes.int, name=name)
 
 T = TypeVar("T")
@@ -394,7 +395,8 @@ def graph_rewrite(sink:UOp, pm:PatternMatcher=constant_folder) -> UOp:
   replace: Dict[UOp, UOp] = {}
   def __inner_rewrite(n:UOp) -> UOp:
     if n in replace: return replace[n]
-    replace_source = (n.op, n.dtype, tuple(__inner_rewrite(y) for y in n.src), n.arg)
+    # replace_source = (n.op, n.dtype, tuple(__inner_rewrite(y) for y in n.src), n.arg)
+    replace_source = (n.op, n.dtype, (lambda x: tuple(sorted(x) if n.commutative() else x))(__inner_rewrite(y) for y in n.src), n.arg)
     if found := nodes.get(replace_source): replace[n] = found
     else: nodes[replace_source] = replace[n] = __inner_rewrite(new_x) if (new_x := pm.rewrite(x:=UOp(*replace_source))) else x
     return replace[n]
@@ -484,13 +486,16 @@ class UOpGraph:
         self._uops.insert(idx, x)
       else:
         self._uops.append(x)
-      for u, ss in scope_children.items():
-        if x in ss:
-          ss.remove(x)
-          if len(ss) == 0: self._uops.append(UOp(end_for_uop[u.op][1], None, (u,)))
+      # for u, ss in scope_children.items():
+      #   if x in ss:
+      #     ss.remove(x)
+      #     if len(ss) == 0: self._uops.append(UOp(end_for_uop[u.op][1], None, (u,)))
       for u in children[x]:
         in_degree[u] -= 1
         if in_degree[u] == 0: push(u)
+
+    for u in (self._uops):
+      if u.op in end_for_uop: self._uops.insert(max([self._uops.index(l) for l in scope_children[u]])+1, UOp(end_for_uop[u.op][1], None, (u,)))
 
     assert self._uops[-1].op is UOps.SINK, f"didn't end with SINK, ended with {self._uops[-1]}"
     self._uops = self._uops[:-1]
